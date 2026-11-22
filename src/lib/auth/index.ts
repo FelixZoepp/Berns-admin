@@ -28,6 +28,8 @@ export const BEREICHE: Record<string, Rolle[]> = {
   "/team": ["admin", "management", "rep"],
   "/touren": ["admin", "management"],
   "/umsetzung": ["admin", "management", "fulfillment"],
+  "/zahlungen": ["admin", "management"],
+  "/skripte": ["admin", "management", "rep"],
   "/saison": ["admin", "management", "marketing"],
   "/pipeline": ["admin", "management"],
   "/planung": ["admin", "management", "marketing"],

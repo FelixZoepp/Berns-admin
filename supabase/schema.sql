@@ -71,7 +71,7 @@ create index if not exists leads_created_idx on leads (created_at);
 create index if not exists leads_utm_content_idx on leads (utm_content);
 
 create table if not exists meetings (
-  id text primary key,       -- Close acti_…
+  id text primary key,       -- Close acti_… oder cal_… (Calendly-Buchung)
   lead_id text not null references leads(id) on delete cascade,
   typ text not null check (typ in ('erstgespraech', 'vip_tour', 'beratung', 'cc2')),
   titel text,
@@ -145,8 +145,14 @@ create table if not exists payments (
   opp_id text,
   at timestamptz not null,
   amount numeric not null,
-  quelle text not null default 'manuell'
+  quelle text not null default 'manuell',  -- stripe | manuell
+  email text,
+  beschreibung text
 );
+alter table payments add column if not exists email text;
+alter table payments add column if not exists beschreibung text;
+create index if not exists payments_opp_idx on payments (opp_id);
+create index if not exists payments_at_idx on payments (at);
 
 -- ---------------------------------------------------------------------------
 -- Meta Ads
@@ -214,7 +220,7 @@ insert into settings (id) values (1) on conflict do nothing;
 
 create table if not exists sync_runs (
   id bigserial primary key,
-  quelle text not null,          -- close | meta | meta-creatives | capi | webhook
+  quelle text not null,          -- close | meta | meta-creatives | capi | webhook | calendly | stripe
   started_at timestamptz not null default now(),
   finished_at timestamptz,
   ok boolean,

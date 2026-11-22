@@ -1,4 +1,5 @@
 import "server-only";
+import { ohneDoppelte } from "@/lib/calendly";
 import { DEFAULT_SETTINGS } from "../kpi/katalog";
 import { adminClient, alleZeilen } from "../supabase/admin";
 import { supabaseKonfiguriert } from "../supabase/env";
@@ -103,7 +104,8 @@ async function ausSupabase(): Promise<Dataset> {
       bankkontoEroeffnet: l.bankkonto_eroeffnet, yellowSlip: l.yellow_slip, testimonial: l.testimonial, empfehlungsPotenzial: l.empfehlungs_potenzial,
       setterId: l.setter_id, closerId: l.closer_id, statusLabel: l.status_label,
     })),
-    meetings: meetings.map((m) => ({ id: m.id, leadId: m.lead_id, typ: m.typ, bookedAt: m.booked_at, startsAt: m.starts_at, outcome: m.outcome, userId: m.user_id })),
+    // Calendly-Termine (cal_…) nur, wenn derselbe Termin nicht schon über den Kalender-Sync als Close-Meeting da ist
+    meetings: ohneDoppelte(meetings.map((m) => ({ id: m.id, leadId: m.lead_id, typ: m.typ, bookedAt: m.booked_at, startsAt: m.starts_at, outcome: m.outcome, userId: m.user_id }))),
     calls: calls.map((c) => ({ id: c.id, leadId: c.lead_id, userId: c.user_id, at: c.at, direction: c.direction, durationSec: c.duration_sec, answered: c.answered })),
     opps: opps.filter((o) => o.pipeline !== "umsetzung").map((o) => ({
       id: o.id, leadId: o.lead_id, pipeline: o.pipeline ?? "sales", stage: o.stage, statusLabel: o.status_label, value: Number(o.value), listenpreis: o.listenpreis != null ? Number(o.listenpreis) : null,
@@ -119,9 +121,10 @@ async function ausSupabase(): Promise<Dataset> {
     })),
     tasks: tasks.map((x) => ({ id: x.id, leadId: x.lead_id, userId: x.user_id, due: x.due, done: x.done })),
     payments: [
-      ...payments.map((p) => ({ id: p.id, leadId: p.lead_id, oppId: p.opp_id, at: p.at, amount: Number(p.amount) })),
-      // Übergangslösung: Feld „Cash collected“ an der Opp, solange kein Zahlungstool angebunden ist
-      ...(payments.length ? [] : opps.filter((o) => o.pipeline !== "umsetzung" && Number(o.cash_collected) > 0).map((o) => ({ id: `cf_${o.id}`, leadId: o.lead_id, oppId: o.id, at: o.won_at ?? o.updated_at, amount: Number(o.cash_collected) }))),
+      ...payments.map((p) => ({ id: p.id, leadId: p.lead_id, oppId: p.opp_id, at: p.at, amount: Number(p.amount), quelle: p.quelle, email: p.email, beschreibung: p.beschreibung })),
+      // Opps ohne erfasste Zahlung: Feld „Cash collected“ (manuell gepflegt) zählt als Zahlung am Gewonnen-Datum
+      ...opps.filter((o) => o.pipeline !== "umsetzung" && Number(o.cash_collected) > 0 && !payments.some((p) => p.opp_id === o.id))
+        .map((o) => ({ id: `cf_${o.id}`, leadId: o.lead_id, oppId: o.id, at: o.won_at ?? o.updated_at, amount: Number(o.cash_collected), quelle: "close", email: null, beschreibung: "Cash collected (Close-Feld)" })),
     ],
     ads: ads.map((a) => ({
       adId: a.ad_id, adName: a.ad_name, adsetId: a.adset_id, adsetName: a.adset_name, campaignId: a.campaign_id, campaignName: a.campaign_name,

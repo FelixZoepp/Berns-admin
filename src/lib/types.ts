@@ -127,6 +127,10 @@ export interface Payment {
   oppId?: string | null;
   at: string;
   amount: number;
+  /** stripe | close (Feld „Cash collected“) | manuell */
+  quelle?: string | null;
+  email?: string | null;
+  beschreibung?: string | null;
 }
 
 export interface AdEntity {

@@ -250,7 +250,28 @@ export async function verarbeiteProtokoll(activityId: string, jetzt: Date = new 
   }
   await sb.from("close_protokolle").upsert({ ...basis, verarbeitet_am: new Date().toISOString() });
   if (zeilen.length) await sb.from("automatik_log").insert(zeilen);
+  await calendlyOutcome(a.lead_id, typ, felder.ergebnis ?? null, jetzt);
   return `Protokoll ${activityId} (${typ}): ${zusammenfassung.join(", ") || "keine Aktion"}`;
+}
+
+/** Rein: Termin-Ergebnis (Supabase meetings.outcome) aus dem Protokoll-Ergebnis. null = Protokoll sagt nichts über den Termin. */
+export function outcomeAusProtokoll(typ: ProtokollTyp, ergebnis: string | null): { typen: string[]; outcome: "stattgefunden" | "no_show" | "verschoben" | "abgesagt" } | null {
+  if (!ergebnis) return null;
+  const typen = typ === "erstgespraech" ? ["erstgespraech"] : typ === "vip_tour" ? ["vip_tour"] : typ === "closing" ? ["beratung", "cc2"] : null;
+  if (!typen) return null;
+  const e = ergebnis.toLowerCase();
+  const outcome = /no-show|nicht angetreten/.test(e) ? "no_show" : e.startsWith("verschoben") ? "verschoben" : e.startsWith("abgesagt") ? "abgesagt" : "stattgefunden";
+  return { typen, outcome };
+}
+
+/** Calendly-Termine (cal_…) haben kein Close-Outcome → aus dem Protokoll übernehmen (letzter offener Termin bis heute). */
+async function calendlyOutcome(leadId: string, typ: ProtokollTyp, ergebnis: string | null, jetzt: Date) {
+  const o = outcomeAusProtokoll(typ, ergebnis);
+  if (!o || !leadId) return;
+  const sb = adminClient();
+  const { data } = await sb.from("meetings").select("id").eq("lead_id", leadId).like("id", "cal_%").in("typ", o.typen).is("outcome", null)
+    .lte("starts_at", new Date(jetzt.getTime() + 12 * 3600000).toISOString()).order("starts_at", { ascending: false }).limit(1);
+  if (data?.[0]) await sb.from("meetings").update({ outcome: o.outcome, updated_at: new Date().toISOString() }).eq("id", data[0].id);
 }
 
 // ---------------------------------------------------------------------------

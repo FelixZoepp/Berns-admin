@@ -10,10 +10,15 @@
     "typecheck": "tsc --noEmit",
     "close:setup": "tsx scripts/close-setup.ts",
     "close:webhook": "tsx scripts/close-webhook.ts",
+    "calendly:webhook": "tsx scripts/calendly-webhook.ts",
+    "stripe:webhook": "tsx scripts/stripe-webhook.ts",
     "admin:anlegen": "tsx scripts/admin-anlegen.ts",
     "sync": "tsx --conditions=react-server scripts/sync.ts",
-    "test": "tsx --test src/lib/close/__tests__/*.test.ts",
-    "close:probe": "tsx --conditions=react-server scripts/automatik-probe.ts"
+    "test": "tsx --conditions=react-server --test src/lib/close/__tests__/*.test.ts",
+    "close:probe": "tsx --conditions=react-server scripts/automatik-probe.ts",
+    "skripte": "node scripts/skripte.mjs",
+    "predev": "node scripts/skripte.mjs",
+    "prebuild": "node scripts/skripte.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

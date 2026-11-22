@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import {
   CalendarCheck, Database, Filter as FilterIcon, LayoutGrid, KanbanSquare, LogOut, Megaphone, PhoneCall, RefreshCw, Settings, SunMoon, Target,
-  Trophy, Handshake, Tv, Palmtree, Plane, CalendarRange,
+  Trophy, Handshake, Tv, Palmtree, Plane, CalendarRange, Wallet, ScrollText,
 } from "lucide-react";
 import { ZypernFlagge } from "./flagge";
 
@@ -16,11 +16,13 @@ const MENUE = [
   { href: "/touren", label: "V.I.P. Touren", icon: Palmtree },
   { href: "/closing", label: "Closing", icon: Handshake },
   { href: "/umsetzung", label: "Umsetzung", icon: Plane },
+  { href: "/zahlungen", label: "Zahlungen", icon: Wallet },
   { href: "/saison", label: "Saison", icon: CalendarRange },
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
   { href: "/team", label: "Team", icon: Trophy },
   { href: "/planung", label: "Ziele & Planung", icon: Target },
   { href: "/mein-tag", label: "Mein Tag", icon: CalendarCheck },
+  { href: "/skripte", label: "Skripte", icon: ScrollText },
 ];
 const ALLGEMEIN = [
   { href: "/datenqualitaet", label: "Datenqualität", icon: Database },

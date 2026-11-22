@@ -22,6 +22,8 @@ Lead → **kostenloser Auswanderungs-Call** (Setting) → **V.I.P. Tour** (1 Tag
 | `/closing` | Vertriebsleitung | Show-Rate, Closing-Rate, AOV, Produkt-Mix, Angebote ohne Bewegung |
 | `/umsetzung` | Stefan, Assistenz | Kundenreise je Phase, hängende Fälle > 14 Tage, Ø Tage bis Firma/Bank/Yellow Slip, Kapazität |
 | `/saison` | Stefan, Marketing | Leads/Abschlüsse nach Monat, Countdown 1.1., Jahreswechsel-Leads |
+| `/zahlungen` | Stefan, Vertriebsleitung | Cash (Stripe + Close-Feld), offene Forderungen, nicht zugeordnete Zahlungen, **Zahlungslink erstellen** |
+| `/skripte` | Setter, Closer | Setting, Closing, V.I.P. Tour, CC2 mit Partner, Angebot nachfassen (Quelle: `docs/skripte/*.md`) |
 | `/pipeline`, `/team`, `/planung`, `/mein-tag`, `/datenqualitaet`, `/einstellungen` | wie Compass | Kanban/Forecast, Leaderboard, Planungsrechner, Tagesansicht, Hygiene, Ziele/Kosten/Rollen |
 
 Ohne Supabase-Verbindung läuft das Dashboard im **Demo-Modus** (simulierte Daten, kein Login, Banner).
@@ -73,6 +75,26 @@ Close-Webhook `activity.custom_activity` → `regeln.ts` (getestet: `npm test`) 
 | Disqualifiziert | Lead „Disqualifiziert“ |
 
 Einschalten unter Einstellungen oder `settings.data.automatik = { "aktiv": true }`. Echttest: `npm run close:probe -- --anwenden` (Test-Lead durch den ganzen Ablauf, wird danach gelöscht).
+
+## Calendly (Buchungen → Close)
+
+Webhook `invitee.created` / `invitee.canceled` → `/api/webhooks/calendly` (`src/lib/calendly.ts`):
+- Lead per E-Mail finden, sonst anlegen (Status „Neu eingetragen“, UTMs aus dem Calendly-Tracking, Telefon aus SMS-Erinnerung oder Frage „Telefon/Handy/WhatsApp“)
+- Termin-Typ aus dem **Namen des Eventtyps**: „V.I.P./Tour“ → Tour · „Beratung/Deluxe/Closing“ → Beratung · „CC2/Partner“ → CC2 · sonst Auswanderungs-Call
+- setzt Termin-Feld (Setting Termin / Closing Termin / V.I.P. Tour Datum), Setter/Closer (= Calendly-Gastgeber, gleiche E-Mail wie in Close), Lead-Status, Opp-Status; Notiz mit den Antworten
+- speichert den Termin als Meeting `cal_…` in Supabase (Show-Rate auch ohne Kalender-Sync in Close). Das Outcome kommt aus dem Protokoll (No-Show/Verschoben/sonst stattgefunden). Ist derselbe Termin auch als Close-Meeting da (±30 Min.), zählt nur das Close-Meeting.
+- Absage → Meeting „abgesagt“ + Notiz + Aufgabe „neu terminieren“; Umbuchung → „verschoben“ + neue Buchung
+- **Keine Nachrichten an Leads** – Bestätigungen/Erinnerungen schickt Calendly selbst.
+
+Einrichtung: `CALENDLY_TOKEN=… npm run calendly:webhook -- https://<domain>/api/webhooks/calendly` → Ausgabe als `CALENDLY_WEBHOOK_SIGNING_KEY` in Vercel.
+
+## Stripe (Abrechnung)
+
+- **Zahlungslink** unter `/zahlungen`: einmal nutzbar, läuft nicht ab, Metadaten mit Close-Lead/Opp. Der Link wird angezeigt und als Notiz in Close abgelegt – **verschickt wird nichts automatisch**. Raten = je Rate ein Link.
+- Webhook `charge.succeeded` / `charge.refunded` → `/api/webhooks/stripe`: Zahlung in `payments` (Cash im Dashboard), Lead über Metadaten oder E-Mail, „Cash collected“ an der Opp in Close = Summe der Zahlungen, Notiz am Lead. Erstattungen als negative Zahlung.
+- Keine automatischen Rechnungen oder Mahnungen. Optional `STRIPE_BELEG=1`: Stripe legt zur **bezahlten** Zahlung einen Beleg an.
+
+Einrichtung: `STRIPE_SECRET_KEY` in Vercel, dann `STRIPE_SECRET_KEY=… npm run stripe:webhook -- https://<domain>/api/webhooks/stripe` → Ausgabe als `STRIPE_WEBHOOK_SECRET`.
 
 ## Einrichtung
 
