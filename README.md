@@ -23,7 +23,8 @@ Lead → **kostenloser Auswanderungs-Call** (Setting) → **V.I.P. Tour** (1 Tag
 | `/umsetzung` | Stefan, Assistenz | Kundenreise je Phase, hängende Fälle > 14 Tage, Ø Tage bis Firma/Bank/Yellow Slip, Kapazität |
 | `/saison` | Stefan, Marketing | Leads/Abschlüsse nach Monat, Countdown 1.1., Jahreswechsel-Leads |
 | `/zahlungen` | Stefan, Vertriebsleitung | Cash (Stripe + Close-Feld), offene Forderungen, nicht zugeordnete Zahlungen, **Zahlungslink erstellen** |
-| `/skripte` | Setter, Closer | Setting, Closing, V.I.P. Tour, CC2 mit Partner, Angebot nachfassen (Quelle: `docs/skripte/*.md`) |
+| `/skripte` (Playbook) | alle | Vertrieb (Setting, Closing, V.I.P. Tour, CC2, Nachfassen), Marketing (Ad-Konzept, Funnel, Leadmagnete), Kundenreise, Kennzahlen & CRM; eigene Dokumente hochladen (Quelle: `docs/playbook/<gruppe>/*.md` + Tabelle `playbook_docs`) |
+| `/gespraeche` | Stefan, Setter, Closer | Transkripte hochladen (.txt/.md/.vtt/.srt oder einfügen) → Claude-Report gegen das Skript: Score, Phasen, Einwände, nächster Schritt, Qualifizierung, Compliance (Steuerberatung/Garantie/Druck/Rabatt), Coaching-Tipp, Close-Notiz; Auswertung je Setter/Closer. Braucht `ANTHROPIC_API_KEY` |
 | `/pipeline`, `/team`, `/planung`, `/mein-tag`, `/datenqualitaet`, `/einstellungen` | wie Compass | Kanban/Forecast, Leaderboard, Planungsrechner, Tagesansicht, Hygiene, Ziele/Kosten/Rollen |
 
 Ohne Supabase-Verbindung läuft das Dashboard im **Demo-Modus** (simulierte Daten, kein Login, Banner).

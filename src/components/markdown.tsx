@@ -24,6 +24,15 @@ export function Markdown({ md, ohneTitel }: { md: string; ohneTitel?: boolean })
   while (i < zeilen.length) {
     const z = zeilen[i];
     if (!z.trim()) { i++; continue; }
+    if (z.startsWith("```")) {
+      const code: string[] = [];
+      i++;
+      while (i < zeilen.length && !zeilen[i].startsWith("```")) code.push(zeilen[i++]);
+      i++;
+      bloecke.push(<pre key={key++} className="scroll-x my-2 rounded-xl bg-surface-2 p-3 text-[12.5px] leading-relaxed text-ink">{code.join("\n")}</pre>);
+      continue;
+    }
+    if (z.startsWith("### ")) { bloecke.push(<h4 key={key++} className="mt-4 text-[14px] font-semibold text-ink">{inline(z.slice(4))}</h4>); i++; continue; }
     if (z.startsWith("# ")) { if (!ohneTitel) bloecke.push(<h2 key={key++} className="text-[20px] font-semibold">{inline(z.slice(2))}</h2>); i++; continue; }
     if (z.startsWith("## ")) { bloecke.push(<h3 key={key++} className="mt-5 text-[16px] font-semibold text-ink">{inline(z.slice(3))}</h3>); i++; continue; }
     if (/^---+$/.test(z.trim())) { bloecke.push(<hr key={key++} className="my-3 border-[var(--glass-border)]" />); i++; continue; }

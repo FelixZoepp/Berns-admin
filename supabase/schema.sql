@@ -338,3 +338,41 @@ create policy lesen on close_protokolle for select to authenticated using (
   app_rolle() in ('superadmin','admin','management') or user_id = app_rep_id());
 drop policy if exists lesen on automatik_log;
 create policy lesen on automatik_log for select to authenticated using (app_rolle() in ('superadmin','admin','management'));
+
+-- ---------------------------------------------------------------------------
+-- Playbook: hochgeladene Dokumente (zusätzlich zu docs/playbook im Code)
+create table if not exists playbook_docs (
+  id uuid primary key default gen_random_uuid(),
+  gruppe text not null default 'eigene',
+  titel text not null,
+  md text not null,
+  erstellt_von text,
+  created_at timestamptz not null default now()
+);
+
+-- Gesprächsanalyse: hochgeladene Transkripte + KI-Report
+create table if not exists gespraeche (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  erstellt_von text,
+  typ text not null check (typ in ('opening', 'setting', 'vip_tour', 'closing', 'cc2', 'followup')),
+  titel text,
+  datum date,
+  lead_id text,
+  rep_id text,                 -- Close-User (Setter/Closer)
+  transkript text not null,
+  status text not null default 'analyse' check (status in ('analyse', 'fertig', 'fehler')),
+  score int,                   -- 0–100
+  report jsonb,                -- KI-Auswertung
+  fehler text,
+  modell text
+);
+create index if not exists gespraeche_created_idx on gespraeche (created_at desc);
+create index if not exists gespraeche_rep_idx on gespraeche (rep_id, created_at desc);
+
+alter table playbook_docs enable row level security;
+alter table gespraeche enable row level security;
+drop policy if exists lesen on playbook_docs;
+create policy lesen on playbook_docs for select to authenticated using (app_rolle() is not null);
+drop policy if exists lesen on gespraeche;
+create policy lesen on gespraeche for select to authenticated using (app_rolle() in ('superadmin','admin','management') or rep_id = app_rep_id());
