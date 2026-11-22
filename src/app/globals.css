@@ -1,0 +1,183 @@
+@import "tailwindcss";
+
+/* Stefan Berns · Zypern-Design: Sonnengelb, Sand, Mittelmeerblau; Kupfer + Oliv aus der Zypern-Flagge.
+   Schwebende Glaskarten, große Radien (Vorbild Azubivorteil-Cockpit). Markenflächen gelb mit dunkler Schrift.
+   Ampelfarben nur für Bewertungen. Hell + Dunkel (OS oder Umschalter). */
+:root {
+  color-scheme: light;
+  --page: #f5f1e6;
+  --panel: rgba(255, 255, 255, 0.28);
+  --surface: #ffffff;
+  --surface-2: rgba(40, 30, 5, 0.045);
+  --ink: #1e1a10;
+  --ink-2: #615a48;
+  --muted: #948b74;
+  --grid: #ede6d3;
+  --axis: #d9cfb5;
+  --border: rgba(40, 30, 5, 0.08);
+  --brand-800: #5e4300;
+  --brand-700: #7d5a00;
+  --brand-600: #a87a00;
+  --brand-500: #e9ac00;
+  --brand-400: #fcc419;
+  --brand-300: #ffdc5e;
+  --brand-100: #fff4cc;
+  --accent: var(--brand-700);
+  --accent-soft: var(--brand-100);
+  --on-brand: #231b05;
+  --kupfer: #d57800; /* Insel auf der Zypern-Flagge */
+  --oliv: #4e5b31;   /* Olivenzweige */
+  --meer: #1f78b4;
+  /* Kategorische Reihen (feste Reihenfolge): Gold, Meer, Oliv, Kupfer, Violett, Rosa, Grau */
+  --s1: #d69a00; --s2: #1f78b4; --s3: #6b8a2c; --s4: #d57800; --s5: #6250d6; --s6: #e87ba4; --s7: #948b74; --s8: #c9c0a8;
+  --good: #2f9d55; --good-ink: #17683a; --good-soft: #e3f3e8;
+  --warn: #ef8a17; --warn-ink: #8f4d00; --warn-soft: #fdeedb;
+  --bad: #d64534; --bad-ink: #b23324; --bad-soft: #fbe6e2;
+  --grey-soft: #eeeadf;
+  --shadow: 0 1px 2px rgba(40, 30, 5, 0.04), 0 8px 24px rgba(40, 30, 5, 0.05);
+  --shadow-brand: 0 14px 30px rgba(214, 150, 0, 0.32);
+  --mesh-1: rgba(255, 210, 80, 0.50);
+  --mesh-2: rgba(110, 185, 230, 0.42);
+  --mesh-3: rgba(240, 196, 140, 0.50);
+  --glass-bg: rgba(255, 255, 255, 0.60);
+  --glass-strong: rgba(255, 255, 255, 0.80);
+  --glass-border: rgba(255, 255, 255, 0.78);
+  --glass-edge: rgba(255, 255, 255, 0.95);
+  --glass-sheen: rgba(255, 255, 255, 0.55);
+  --glass-shadow: 0 1px 1px rgba(40, 30, 5, 0.04), 0 10px 30px rgba(150, 110, 20, 0.10), 0 2px 6px rgba(40, 30, 5, 0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0c0a06; --panel: rgba(255, 255, 255, 0.03); --surface: #1a1710; --surface-2: rgba(255, 255, 255, 0.05);
+    --ink: #f4efe2; --ink-2: #c2b9a3; --muted: #8c8470; --grid: #2a261c; --axis: #3d3727; --border: rgba(255, 255, 255, 0.08);
+    --brand-800: #4a3600; --brand-700: #f0b400; --brand-600: #fcc419; --brand-500: #e9ac00; --brand-400: #fcc419; --brand-300: #ffdc5e; --brand-100: #2b230b;
+    --accent: #fcc419; --accent-soft: #2b230b; --on-brand: #231b05;
+    --s1: #f2b705; --s2: #3d97d6; --s3: #8fb04a; --s4: #e98a1a; --s5: #9085e9; --s6: #d55181; --s7: #8c8470; --s8: #4f4836;
+    --good: #2fb468; --good-ink: #4fd18a; --good-soft: #10261a; --warn: #f39a2e; --warn-ink: #ffb35c; --warn-soft: #2e1f0c; --bad: #e05a4a; --bad-ink: #f28576; --bad-soft: #2e1714; --grey-soft: #25211a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3); --shadow-brand: 0 14px 30px rgba(0, 0, 0, 0.45);
+    --mesh-1: rgba(150, 110, 10, 0.40); --mesh-2: rgba(20, 70, 110, 0.40); --mesh-3: rgba(110, 60, 20, 0.30);
+    --glass-bg: rgba(36, 32, 22, 0.58); --glass-strong: rgba(36, 32, 22, 0.84); --glass-border: rgba(255, 255, 255, 0.10);
+    --glass-edge: rgba(255, 255, 255, 0.16); --glass-sheen: rgba(255, 255, 255, 0.06);
+    --glass-shadow: 0 1px 1px rgba(0,0,0,0.3), 0 12px 32px rgba(0,0,0,0.38);
+  }
+}
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0c0a06; --panel: rgba(255, 255, 255, 0.03); --surface: #1a1710; --surface-2: rgba(255, 255, 255, 0.05);
+    --ink: #f4efe2; --ink-2: #c2b9a3; --muted: #8c8470; --grid: #2a261c; --axis: #3d3727; --border: rgba(255, 255, 255, 0.08);
+    --brand-800: #4a3600; --brand-700: #f0b400; --brand-600: #fcc419; --brand-500: #e9ac00; --brand-400: #fcc419; --brand-300: #ffdc5e; --brand-100: #2b230b;
+    --accent: #fcc419; --accent-soft: #2b230b; --on-brand: #231b05;
+    --s1: #f2b705; --s2: #3d97d6; --s3: #8fb04a; --s4: #e98a1a; --s5: #9085e9; --s6: #d55181; --s7: #8c8470; --s8: #4f4836;
+    --good: #2fb468; --good-ink: #4fd18a; --good-soft: #10261a; --warn: #f39a2e; --warn-ink: #ffb35c; --warn-soft: #2e1f0c; --bad: #e05a4a; --bad-ink: #f28576; --bad-soft: #2e1714; --grey-soft: #25211a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3); --shadow-brand: 0 14px 30px rgba(0, 0, 0, 0.45);
+    --mesh-1: rgba(150, 110, 10, 0.40); --mesh-2: rgba(20, 70, 110, 0.40); --mesh-3: rgba(110, 60, 20, 0.30);
+    --glass-bg: rgba(36, 32, 22, 0.58); --glass-strong: rgba(36, 32, 22, 0.84); --glass-border: rgba(255, 255, 255, 0.10);
+    --glass-edge: rgba(255, 255, 255, 0.16); --glass-sheen: rgba(255, 255, 255, 0.06);
+    --glass-shadow: 0 1px 1px rgba(0,0,0,0.3), 0 12px 32px rgba(0,0,0,0.38);
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-panel: var(--panel);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-grid: var(--grid);
+  --color-line: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-brand: var(--on-brand);
+  --color-kupfer: var(--kupfer);
+  --color-oliv: var(--oliv);
+  --color-meer: var(--meer);
+  --color-brand-800: var(--brand-800);
+  --color-brand-700: var(--brand-700);
+  --color-brand-600: var(--brand-600);
+  --color-brand-500: var(--brand-500);
+  --color-brand-400: var(--brand-400);
+  --color-brand-300: var(--brand-300);
+  --color-brand-100: var(--brand-100);
+  --color-good: var(--good);
+  --color-good-ink: var(--good-ink);
+  --color-good-soft: var(--good-soft);
+  --color-warn: var(--warn);
+  --color-warn-ink: var(--warn-ink);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-ink: var(--bad-ink);
+  --color-bad-soft: var(--bad-soft);
+  --color-grey-soft: var(--grey-soft);
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html, body { color: var(--ink); }
+html { background: var(--page); }
+body {
+  font-family: var(--font-sans); -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01";
+  /* Liquid-Glass-Hintergrund: weiche Farbfelder, auf denen das Glas „liegt“ */
+  background:
+    radial-gradient(60vw 50vh at 8% 0%, var(--mesh-1), transparent 70%),
+    radial-gradient(50vw 45vh at 100% 10%, var(--mesh-2), transparent 70%),
+    radial-gradient(70vw 60vh at 60% 100%, var(--mesh-3), transparent 70%),
+    var(--page);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* ---- Liquid Glass ---------------------------------------------------- */
+.glass, .card {
+  position: relative; isolation: isolate;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+.card { border-radius: 28px; }
+/* Lichtkante oben + weicher Glanz */
+.glass::before, .card::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(180deg, var(--glass-sheen) 0%, transparent 38%);
+  box-shadow: inset 0 1px 0 var(--glass-edge), inset 0 -1px 0 rgba(255,255,255,0.04);
+}
+.glass-strong { background: var(--glass-strong); }
+
+.card-brand {
+  position: relative; isolation: isolate; overflow: hidden; color: var(--on-brand); border-radius: 28px; border: 1px solid rgba(255,255,255,0.45);
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(255, 250, 220, 0.65) 0%, transparent 55%),
+    linear-gradient(160deg, #ffd84a 0%, #fcc419 45%, #eaa600 100%);
+  box-shadow: var(--shadow-brand), inset 0 1px 0 rgba(255,255,255,0.7), inset 0 -20px 40px rgba(160, 90, 0, 0.12);
+}
+/* Sonne oben rechts */
+.card-brand::after {
+  content: ""; position: absolute; z-index: -1; width: 220px; height: 220px; right: -70px; top: -90px; border-radius: 999px; pointer-events: none;
+  background: radial-gradient(circle, rgba(255,255,255,0.55), transparent 65%);
+}
+/* Wellen (Mittelmeer) am unteren Rand */
+.card-brand::before {
+  content: ""; position: absolute; z-index: -1; left: 0; right: 0; bottom: 0; height: 46px; pointer-events: none; opacity: 0.22;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 24' preserveAspectRatio='none'%3E%3Cpath d='M0 12 Q15 2 30 12 T60 12 T90 12 T120 12 V24 H0Z' fill='%23d57800'/%3E%3C/svg%3E") repeat-x bottom / 120px 24px;
+}
+
+/* Glas-Knöpfe und Pillen */
+.liquid-btn {
+  background: linear-gradient(180deg, rgba(255,255,255,0.45), rgba(255,255,255,0.05)), var(--brand-400);
+  color: var(--on-brand); box-shadow: 0 6px 16px rgba(214, 150, 0, 0.32), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+.liquid-pill-aktiv {
+  background: linear-gradient(180deg, rgba(255,255,255,0.4), rgba(255,255,255,0) 60%), var(--brand-400);
+  color: var(--on-brand); font-weight: 600; box-shadow: 0 4px 12px rgba(214, 150, 0, 0.30), inset 0 1px 0 rgba(255,255,255,0.55);
+}
+
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.recharts-cartesian-grid line { stroke: var(--grid); }
+.recharts-text { fill: var(--muted); font-size: 11px; }
+.recharts-tooltip-cursor { fill: var(--surface-2); }
+.schraffur { background-image: repeating-linear-gradient(135deg, var(--axis) 0 2px, transparent 2px 6px); }
+@media (prefers-reduced-transparency: reduce) { .glass, .card { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+@media print { .no-print { display: none !important; } .card { background: #fff; backdrop-filter: none; box-shadow: none; } }

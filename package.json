@@ -1,0 +1,41 @@
+{
+  "name": "berns-admin",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "close:setup": "tsx scripts/close-setup.ts",
+    "close:webhook": "tsx scripts/close-webhook.ts",
+    "admin:anlegen": "tsx scripts/admin-anlegen.ts",
+    "sync": "tsx --conditions=react-server scripts/sync.ts",
+    "test": "tsx --test src/lib/close/__tests__/*.test.ts",
+    "close:probe": "tsx --conditions=react-server scripts/automatik-probe.ts"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "lucide-react": "^1.74.0",
+    "next": "16.4.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "recharts": "^3.11.0",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "4.3.3",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.6",
+    "tailwindcss": "4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "^5"
+  }
+}
