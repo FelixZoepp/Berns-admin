@@ -177,5 +177,16 @@ test("Smart Views: alle IDs vorhanden → nichts fehlt, Namen eindeutig; ohne ID
   assert.ok(v.length >= 22);
   assert.ok(v.every((x) => x.fehlt.length === 0), v.filter((x) => x.fehlt.length).map((x) => `${x.name}: ${x.fehlt}`).join("; "));
   assert.equal(new Set(v.map((x) => x.name)).size, v.length);
-  assert.ok(smartViews({ leadStatus: {}, oppStatus: {}, umsetzungStatus: [], feld: {}, oppFeld: {} }).every((x) => x.fehlt.length > 0));
+  const ohneIds = smartViews({ leadStatus: {}, oppStatus: {}, umsetzungStatus: [], feld: {}, oppFeld: {} });
+  assert.ok(ohneIds.filter((x) => !x.name.startsWith("--")).every((x) => x.fehlt.length > 0));
+  // Reihenfolge oben → unten: Trenner, Kunden (0.9 zuletzt), Closing 1.x, Setting 2.x, Opening 3.x
+  const namen = v.map((x) => x.name);
+  assert.deepEqual(namen.filter((n) => n.startsWith("--")), ["--Kunden--", "--Closing--", "--Setting--", "--Opening--"]);
+  assert.equal(namen[0], "--Kunden--");
+  assert.ok(namen.indexOf("💤 0.9 Ohne Bewegung > 7 Tage") === namen.indexOf("--Closing--") - 1);
+  const nr = namen.map((n) => n.match(/\b([123])\.(\d)\b/)).filter(Boolean).map((m) => Number(`${m![1]}.${m![2]}`));
+  assert.deepEqual(nr, [...nr].sort((a, b) => a - b));
+  assert.equal(namen[namen.indexOf("--Closing--") + 1], "📅 1.0 (SC) Beratungsgespräche heute");
+  assert.equal(namen[namen.indexOf("--Setting--") + 1], "📅 2.0 (QC) Erstgespräche heute");
+  assert.equal(namen[namen.indexOf("--Opening--") + 1], "🔥 3.0 Neu eingetragen – sofort anrufen");
 });

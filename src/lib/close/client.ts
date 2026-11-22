@@ -26,7 +26,8 @@ export class CloseClient {
       return this.req<T>(pfad, init, versuch + 1);
     }
     if (!res.ok) throw new Error(`Close ${init.method ?? "GET"} ${pfad}: ${res.status} ${(await res.text()).slice(0, 300)}`);
-    return (await res.json()) as T;
+    const text = await res.text(); // DELETE liefert teils einen leeren Body
+    return (text ? JSON.parse(text) : {}) as T;
   }
 
   get<T = any>(pfad: string) { return this.req<T>(pfad); }

@@ -1,6 +1,7 @@
 // Legt die Close-Struktur an, die das Dashboard erwartet (idempotent).
 // Trockenlauf:  npx tsx scripts/close-setup.ts
 // Anlegen:      npx tsx scripts/close-setup.ts --anwenden
+// Zusätzlich:   --views-neu (Smart Views in Soll-Reihenfolge neu anlegen, --umgekehrt dreht sie), --aufraeumen (Close-Standardstatus/-Pipeline weg, wenn unbenutzt)
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { flag } from "./_env";
 import { CloseClient } from "../src/lib/close/client";
@@ -147,7 +148,17 @@ async function main() {
     },
     oppFeld: { verlustgrund: oppCfNeu.find((x: any) => lc(x.name) === lc(OPP_FELDER.verlustgrund.name))?.id },
   };
-  for (const v of smartViews(ids)) {
+  const soll = smartViews(ids);
+  // --views-neu: eigene Views löschen und in der Soll-Reihenfolge (oben → unten) neu anlegen
+  if (flag("views-neu")) {
+    const namen = new Set(soll.map((v) => lc(v.name)));
+    const weg = views.filter((x: any) => namen.has(lc(x.name)));
+    console.log(`Smart Views neu ordnen: ${weg.length} löschen, ${soll.length} in Reihenfolge anlegen`);
+    if (anwenden) for (const x of weg) await cl.req(`saved_search/${x.id}/`, { method: "DELETE" });
+    views.splice(0, views.length, ...views.filter((x: any) => !namen.has(lc(x.name))));
+    if (flag("umgekehrt")) soll.reverse();
+  }
+  for (const v of soll) {
     if (views.some((x: any) => lc(x.name) === lc(v.name))) { console.log(`✓ Smart View ${v.name}`); continue; }
     todo.push(`Smart View „${v.name}“`);
     if (v.fehlt.length) { if (anwenden) console.warn(`  ! übersprungen, fehlt: ${v.fehlt.join(", ")}`); continue; }
@@ -158,7 +169,32 @@ async function main() {
       console.warn(`  ! Abfrage für „${v.name}“ ungültig: ${(e as Error).message.slice(0, 200)}`);
       continue;
     }
-    if (anwenden) await cl.post("saved_search/", { name: v.name, type: "lead", s_query: v.s_query, is_shared: true });
+    if (anwenden) {
+      await cl.post("saved_search/", { name: v.name, type: "lead", s_query: v.s_query, is_shared: true });
+      await new Promise((r) => setTimeout(r, 1100)); // eindeutige Anlage-Reihenfolge
+    }
+  }
+
+  // --aufraeumen: Close-Standardstatus (englisch) und Standard-Pipeline „Sales“ entfernen – nur wenn unbenutzt
+  if (flag("aufraeumen")) {
+    const eigene = new Set(Object.values(LEAD_STATUS).map(lc));
+    for (const st of (await cl.alle("status/lead/")).filter((x: any) => !eigene.has(lc(x.label)))) {
+      const n = (await cl.get(`lead/?query=${encodeURIComponent(`lead_status:"${st.label}"`)}&_limit=0`)).total_results ?? 0;
+      if (n > 0) { console.log(`  ! Lead-Status „${st.label}“ hat ${n} Leads – bleibt`); continue; }
+      console.log(`  − Lead-Status „${st.label}“`);
+      if (anwenden) await cl.req(`status/lead/${st.id}/`, { method: "DELETE" });
+    }
+    const eigenePipes = new Set(Object.values(PIPELINES).map((p) => p.name));
+    for (const p of (await cl.alle("pipeline/")).filter((x: any) => !eigenePipes.has(x.name))) {
+      const ids = new Set((p.statuses ?? []).map((x: any) => x.id));
+      const opps = (await cl.alle("opportunity/", { _fields: "id,status_id" })).filter((o: any) => ids.has(o.status_id));
+      if (opps.length) { console.log(`  ! Pipeline „${p.name}“ hat ${opps.length} Opps – bleibt`); continue; }
+      console.log(`  − Pipeline „${p.name}“ (${(p.statuses ?? []).map((x: any) => x.label).join(", ")})`);
+      if (anwenden) {
+        for (const x of p.statuses ?? []) await cl.req(`status/opportunity/${x.id}/`, { method: "DELETE" }).catch((e) => console.warn(`    ! ${x.label}: ${e.message.slice(0, 120)}`));
+        await cl.req(`pipeline/${p.id}/`, { method: "DELETE" });
+      }
+    }
   }
 
   console.log(`\n${todo.length ? (anwenden ? "Angelegt" : "Fehlt") : "Alles vorhanden."}${todo.length ? ` (${todo.length}):` : ""}`);

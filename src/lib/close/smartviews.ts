@@ -117,5 +117,23 @@ export function smartViews(ids: SmartViewIds): SmartViewDef[] {
   add("🤝 Empfehlungsfrage fällig", sQuery(and(ls("ausgewandert"), cf(f("empfehlungsPotenzial"), wert("hoch")), cf(f("yellowSlip"), aelterAlsTage(30))), [sortierung("date_updated", "asc")]));
   add("💤 0.9 Ohne Bewegung > 7 Tage", sQuery(deal(AKTIV, feld("opportunity", "date_updated", aelterAlsTage(7))), [sortierung("date_updated", "asc")]));
 
-  return views;
+  return mitTrennern(views);
+}
+
+/** Trenner-Views (wie bei Felix: „--Closing--“): Abfrage ohne Treffer, nur Überschrift in der Seitenleiste. */
+export const TRENNER = ["--Kunden--", "--Closing--", "--Setting--", "--Opening--"] as const;
+export const LEERE_ABFRAGE: Q = sQuery(feld("lead", "num_outgoing_calls", zahl({ gte: 1, lte: 0 })));
+
+/** Reihenfolge von oben nach unten: Kunden (inkl. 0.9) · Closing 1.x · Setting 2.x · Opening 3.x, je mit Trenner davor. */
+export function mitTrennern(views: SmartViewDef[]): SmartViewDef[] {
+  const nummer = (n: string) => Number(n.match(/\b(\d)\.(\d)\b/)?.slice(1).join(".") ?? NaN);
+  const gruppe = (n: string) => { const x = nummer(n); return x >= 1 && x < 2 ? 1 : x >= 2 && x < 3 ? 2 : x >= 3 && x < 4 ? 3 : 0; };
+  const rang = (n: string) => (Number.isNaN(nummer(n)) ? -1 : nummer(n)); // Kunden-Views ohne Nummer zuerst, 0.9 ans Ende der Gruppe
+  const out: SmartViewDef[] = [];
+  TRENNER.forEach((name, g) => {
+    const teil = views.map((v, i) => ({ v, i })).filter(({ v }) => gruppe(v.name) === g)
+      .sort((a, b) => rang(a.v.name) - rang(b.v.name) || a.i - b.i).map(({ v }) => v);
+    if (teil.length) out.push({ name, s_query: LEERE_ABFRAGE, fehlt: [] }, ...teil);
+  });
+  return out;
 }
