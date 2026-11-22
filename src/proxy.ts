@@ -6,8 +6,9 @@ const OFFEN = ["/login", "/api/webhooks", "/api/sync", "/api/cron", "/api/capi",
 export async function proxy(req: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  // Ohne Supabase: Demo-Modus, kein Login
-  if (!url || !key) return NextResponse.next();
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  // Ohne vollständige Supabase-Konfiguration: Demo-Modus, kein Login (gleiche Bedingung wie supabaseKonfiguriert())
+  if (!url || !key || !service) return NextResponse.next();
 
   let res = NextResponse.next({ request: req });
   const sb = createServerClient(url, key, {
