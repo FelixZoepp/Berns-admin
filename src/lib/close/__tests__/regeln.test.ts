@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { angebotNachfassen, regeln, REGEL_IDS, SPERRE_NICHT_ERREICHT_STUNDEN, type Aktion } from "../regeln";
+import { angebotNachfassen, anrufVersuch, COOLDOWN_STUNDEN, erreichbarkeit, protokollVersuch, regeln, REGEL_IDS, zaehleFehlversuche, type Aktion, type Versuch } from "../regeln";
+import { quelleFuerNeuenLead } from "../automatik";
 import { ERGEBNIS, PROTOKOLLE } from "../protokolle";
 import { smartViews } from "../smartviews";
 import { LEAD_STATUS, OPP_STATUS, gewinnklasseAus, istQualifiziert, meetingTyp } from "../felder";
@@ -21,14 +22,80 @@ test("Erstkontakt: Erstgespräch gebucht → Lead „Setting“, Termin, Setter,
   assert.equal(finde(r.aktionen, "opp")?.ziel, "setting");
 });
 
-test("Erstkontakt: nicht erreicht / Mailbox → kurze Sperre, kein Statuswechsel", () => {
+test("Opening: nicht erreicht / Mailbox → Protokoll selbst ändert nichts (Cooldown über Erreichbarkeit), mit Rückrufzeit → Sperre bis dahin", () => {
   for (const ergebnis of [ERGEBNIS.erstkontakt.nichtErreicht, ERGEBNIS.erstkontakt.mailbox]) {
     const r = regeln("erstkontakt", { ergebnis }, jetzt);
     assert.equal(r.regel, "erstkontakt.nicht_erreicht");
-    const bis = new Date(finde(r.aktionen, "lead_felder")!.felder.gesperrtBis as string).getTime();
-    assert.equal(bis - jetzt.getTime(), SPERRE_NICHT_ERREICHT_STUNDEN * 3600_000);
-    assert.equal(finde(r.aktionen, "lead_status"), undefined);
+    assert.equal(r.aktionen.length, 0);
   }
+  const r = regeln("erstkontakt", { ergebnis: ERGEBNIS.erstkontakt.nichtErreicht, kalender: morgen }, jetzt);
+  assert.equal(finde(r.aktionen, "lead_felder")!.felder.gesperrtBis, new Date(morgen).toISOString());
+});
+
+const v = (at: string, ergebnis: Versuch["ergebnis"], quelle: Versuch["quelle"] = "anruf"): Versuch => ({ at, ergebnis, quelle });
+
+test("Erreichbarkeit: Fehlversuche seit letztem Erreichen zählen, Anruf + Protokoll = ein Versuch", () => {
+  assert.deepEqual(zaehleFehlversuche([]), { anzahl: 0, letzter: null });
+  const r = zaehleFehlversuche([
+    v("2026-11-10T09:00:00Z", "fehl"), v("2026-11-11T09:00:00Z", "erreicht"), // davor erreicht → alte Fehlversuche zählen nicht
+    v("2026-11-12T09:00:00Z", "fehl"), v("2026-11-12T09:05:00Z", "fehl", "protokoll"), // gleicher Versuch
+    v("2026-11-13T09:00:00Z", "fehl", "protokoll"), v("2026-11-14T15:00:00Z", "fehl"),
+  ]);
+  assert.deepEqual(r, { anzahl: 3, letzter: "2026-11-14T15:00:00Z" });
+});
+
+test("Erreichbarkeit: Anruf-/Protokoll-Einordnung", () => {
+  const c = (disposition: string, duration = 0, direction = "outbound") => ({ direction, disposition, duration, date_created: "2026-11-18T10:00:00Z" });
+  assert.equal(anrufVersuch(c("no-answer"), null)?.ergebnis, "fehl");
+  assert.equal(anrufVersuch(c("vm-left"), null)?.ergebnis, "fehl");
+  assert.equal(anrufVersuch(c("answered", 95), null)?.ergebnis, "erreicht");
+  assert.equal(anrufVersuch(c("answered", 95), "Mailbox")?.ergebnis, "fehl"); // Ergebnis schlägt Disposition
+  assert.equal(anrufVersuch(c("answered", 5), null), null);
+  assert.equal(anrufVersuch(c("no-answer", 0, "inbound"), null), null);
+  assert.equal(anrufVersuch(c("answered", 30), "Falsche Nummer"), null);
+  assert.equal(protokollVersuch("erstkontakt", { erreicht: "Nein / Mailbox" }, "x")?.ergebnis, "fehl");
+  assert.equal(protokollVersuch("erstkontakt", { ergebnis: ERGEBNIS.erstkontakt.egTerminiert }, "x")?.ergebnis, "erreicht");
+  assert.equal(protokollVersuch("followup", { erreicht: "Ja" }, "x")?.ergebnis, "erreicht");
+  assert.equal(protokollVersuch("erstgespraech", { ergebnis: ERGEBNIS.erstgespraech.noShow }, "x"), null);
+  assert.equal(protokollVersuch("closing", { ergebnis: ERGEBNIS.closing.angebot }, "x")?.ergebnis, "erreicht");
+});
+
+test("Erreichbarkeit: Cooldown wächst je Versuch, nie kürzer als bestehende Sperre; 7. Versuch → Bad Data", () => {
+  const lead = { status: "Neu eingetragen", gesperrtBis: null, fehlversuche: null };
+  const letzter = "2026-11-18T10:00:00Z";
+  COOLDOWN_STUNDEN.forEach((h, i) => {
+    const r = erreichbarkeit(i + 1, letzter, jetzt, lead);
+    assert.equal(r.regel, "erreichbarkeit.cooldown");
+    const f = finde(r.aktionen, "lead_felder")!.felder;
+    assert.equal(f.fehlversuche, i + 1);
+    assert.equal(new Date(f.gesperrtBis as string).getTime() - new Date(letzter).getTime(), h * 3600_000);
+  });
+  assert.deepEqual(COOLDOWN_STUNDEN, [2, 4, 24, 24, 48, 72]);
+  // längere Sperre (z. B. Rückruf in 2 Wochen) bleibt
+  const lang = erreichbarkeit(1, letzter, jetzt, { ...lead, gesperrtBis: inZweiWochen });
+  assert.equal(finde(lang.aktionen, "lead_felder")!.felder.gesperrtBis, undefined);
+  // 7. Versuch
+  const bad = erreichbarkeit(7, letzter, jetzt, lead);
+  assert.equal(bad.regel, "erreichbarkeit.nicht_erreichbar");
+  assert.equal(finde(bad.aktionen, "lead_status")?.status, "badData");
+  assert.equal(finde(bad.aktionen, "opps_verloren")?.grund, "Nicht erreichbar");
+  // Kunden / schon Bad Data → nichts
+  assert.equal(erreichbarkeit(7, letzter, jetzt, { ...lead, status: "Kunde in Umsetzung" }).aktionen.length, 0);
+  assert.equal(erreichbarkeit(9, letzter, jetzt, { ...lead, status: "Bad Data" }).aktionen.length, 0);
+  // erreicht → Zähler zurück
+  assert.deepEqual(erreichbarkeit(0, null, jetzt, { ...lead, fehlversuche: 4 }).aktionen, [{ art: "lead_felder", felder: { fehlversuche: 0 } }]);
+  assert.equal(erreichbarkeit(0, null, jetzt, lead).aktionen.length, 0);
+  // unverändert → keine Aktion
+  const zweiter = finde(erreichbarkeit(2, letzter, jetzt, lead).aktionen, "lead_felder")!.felder.gesperrtBis as string;
+  assert.equal(erreichbarkeit(2, letzter, jetzt, { ...lead, fehlversuche: 2, gesperrtBis: zweiter }).aktionen.length, 0);
+});
+
+test("Leadquelle für neuen Lead aus fbclid/UTM, vorhandene bleibt", () => {
+  assert.equal(quelleFuerNeuenLead(null, null, "IwAR123"), "Meta Ads");
+  assert.equal(quelleFuerNeuenLead(null, "youtube", null), "YouTube");
+  assert.equal(quelleFuerNeuenLead("Empfehlung", "facebook", null), null);
+  assert.equal(quelleFuerNeuenLead(null, "newsletter", null), null);
+  assert.equal(quelleFuerNeuenLead(null, null, null), null);
 });
 
 test("Erstkontakt: Kein Interesse → Unqualifiziert, 90 Tage gesperrt (Workflow 8)", () => {
@@ -130,8 +197,9 @@ test("Follow-up: Beratung terminiert nutzt „Gelegt auf“ als Closer", () => {
   assert.equal(finde(r.aktionen, "lead_felder")?.felder.closer, "user_x");
 });
 
-test("Follow-up: Nicht erreicht → 1 Tag Sperre, sonst nichts", () => {
-  assert.deepEqual(arten(regeln("followup", { erreicht: "Nein / Mailbox" }, jetzt).aktionen), ["lead_felder"]);
+test("Follow-up: Nicht erreicht → Cooldown über Erreichbarkeit, mit Termin → Sperre bis dahin", () => {
+  assert.deepEqual(arten(regeln("followup", { erreicht: "Nein / Mailbox" }, jetzt).aktionen), []);
+  assert.deepEqual(arten(regeln("followup", { erreicht: "Nein / Mailbox", kalender: morgen }, jetzt).aktionen), ["lead_felder"]);
 });
 
 test("Ohne Ergebnis → keine Aktion", () => {

@@ -19,7 +19,7 @@ export const ANGEBOT_NACHFASSEN_TAGE = [2, 5, 10]; // Workflow 6
 
 /** Qualifizierungsfelder aus dem Setting-Protokoll, die 1:1 an den Lead geschrieben werden. */
 export const QUALI_FELDER = ["wohnsitz", "taetigkeit", "gewinnklasse", "ortsunabhaengig", "kapitalgesellschaft", "familie", "region", "umzug", "partnerImBoot", "groessteSorge"] as const;
-export type LeadFeldKey = "gesperrtBis" | "erstgespraechAm" | "beratungAm" | "tourDatum" | "setter" | "qualifiziertDurch" | "closer" | "paketStart" | (typeof QUALI_FELDER)[number];
+export type LeadFeldKey = "gesperrtBis" | "fehlversuche" | "quelle" | "erstgespraechAm" | "beratungAm" | "tourDatum" | "setter" | "qualifiziertDurch" | "closer" | "paketStart" | (typeof QUALI_FELDER)[number];
 
 export type Aktion =
   | { art: "lead_status"; status: LeadStatusKey }
@@ -163,6 +163,102 @@ function rueckrufAufgabe(text: string, f: Felder, jetzt: Date, standardInStunden
   return { d, aufgabe: { art: "aufgabe" as const, text: `${text}${inZukunft(f.kalender, jetzt) ? ` (${uhrzeit(d)} Uhr)` : ""}`, datum: iso(d), an: "bearbeiter" as const } };
 }
 
+/** Nicht erreicht: Cooldown + Zähler macht die Regel „erreichbarkeit“ (zählt Anrufe + Protokolle). Hier nur ein ausdrücklicher Rückruf-Zeitpunkt. */
+function nichtErreichtProtokoll(regel: string, f: Felder, jetzt: Date): RegelErgebnis {
+  if (inZukunft(f.kalender, jetzt)) return { regel, beschreibung: "Nicht erreicht mit Rückrufzeit → gesperrt bis dahin (Cooldown/Zähler: Regel Erreichbarkeit)", aktionen: [{ art: "lead_felder", felder: { gesperrtBis: iso(new Date(f.kalender!)) } }] };
+  return leer(regel, "Nicht erreicht → Cooldown und Zähler über die Regel Erreichbarkeit");
+}
+
+// ---------------------------------------------------------------------------
+// Erreichbarkeit: Fehlversuche zählen, Cooldown je Versuch, ab dem 7. Fehlversuch Bad Data
+
+/** Sperre nach dem 1., 2., … 6. Fehlversuch (Stunden). Beim 7. → Bad Data. */
+export const COOLDOWN_STUNDEN = [2, 4, 24, 24, 48, 72];
+export const MAX_FEHLVERSUCHE = 7;
+/** Ein Protokoll „nicht erreicht“ bis 30 Min. neben einem gescheiterten Anruf ist derselbe Versuch. */
+const GLEICHER_VERSUCH_MS = 30 * 60_000;
+
+export interface Versuch { at: string; ergebnis: "fehl" | "erreicht"; quelle: "anruf" | "protokoll" }
+
+const FEHL_OUTCOMES = ["nicht erreicht", "mailbox"];
+const FEHL_DISPOSITION = ["no-answer", "busy", "vm-answer", "vm-left"];
+
+/** Close-Anruf → Versuch (nur ausgehend). Ergebnis (Outcome) schlägt Disposition. */
+export function anrufVersuch(c: { direction?: string; disposition?: string | null; duration?: number | null; date_created: string }, outcome: string | null | undefined): Versuch | null {
+  if (c.direction !== "outbound") return null;
+  const o = (outcome ?? "").trim().toLowerCase();
+  if (o === "falsche nummer") return null; // eigene Regel (Bad Data)
+  if (FEHL_OUTCOMES.includes(o)) return { at: c.date_created, ergebnis: "fehl", quelle: "anruf" };
+  if (o) return { at: c.date_created, ergebnis: "erreicht", quelle: "anruf" };
+  if (FEHL_DISPOSITION.includes(c.disposition ?? "")) return { at: c.date_created, ergebnis: "fehl", quelle: "anruf" };
+  if (c.disposition === "answered" && (c.duration ?? 0) >= 20) return { at: c.date_created, ergebnis: "erreicht", quelle: "anruf" };
+  return null;
+}
+
+/** Protokoll → Versuch. Opening/Follow-up: „nicht erreicht/Mailbox“ = Fehlversuch, sonst erreicht. Setting/Tour/Closing: erreicht (außer No-Show). */
+export function protokollVersuch(typ: ProtokollTyp, f: Felder, at: string): Versuch | null {
+  const e = (f.ergebnis ?? "").trim();
+  if (typ === "erstkontakt" || typ === "followup") {
+    if (startsWith(f.erreicht, "Falsche Nummer") || startsWith(e, "Falsche Nummer")) return null;
+    if (startsWith(f.erreicht, "Nein") || startsWith(e, "Nicht erreicht") || startsWith(e, "Mailbox")) return { at, ergebnis: "fehl", quelle: "protokoll" };
+    if (startsWith(f.erreicht, "Ja") || e) return { at, ergebnis: "erreicht", quelle: "protokoll" };
+    return null;
+  }
+  if (!e || /no-show|nicht angetreten/i.test(e)) return null;
+  return { at, ergebnis: "erreicht", quelle: "protokoll" };
+}
+
+/** Fehlversuche seit dem letzten Erreichen (neueste zuerst gezählt, Dubletten Anruf+Protokoll nur einmal). */
+export function zaehleFehlversuche(versuche: Versuch[]): { anzahl: number; letzter: string | null } {
+  const v = [...versuche].sort((a, b) => b.at.localeCompare(a.at));
+  const gezaehlteAnrufe: number[] = [];
+  const protokolle: number[] = [];
+  let anzahl = 0, letzter: string | null = null;
+  for (const x of v) {
+    if (x.ergebnis === "erreicht") break;
+    const t = new Date(x.at).getTime();
+    const nah = (liste: number[]) => liste.some((y) => Math.abs(y - t) <= GLEICHER_VERSUCH_MS);
+    if (x.quelle === "protokoll" ? nah(gezaehlteAnrufe) : nah(protokolle)) { (x.quelle === "anruf" ? gezaehlteAnrufe : protokolle).push(t); continue; }
+    (x.quelle === "anruf" ? gezaehlteAnrufe : protokolle).push(t);
+    anzahl++;
+    letzter ??= x.at;
+  }
+  return { anzahl, letzter };
+}
+
+/** Lead-Stand → Aktionen. Kunden/Ausgewanderte/Disqualifizierte/Bad Data bleiben unberührt. Längere Sperren (Rückruf, 90 Tage) werden nie verkürzt. */
+export function erreichbarkeit(anzahl: number, letzter: string | null, jetzt: Date, lead: { status: string | null; gesperrtBis: string | null; fehlversuche: number | null }): RegelErgebnis {
+  const st = (lead.status ?? "").toLowerCase();
+  if (["kunde in umsetzung", "ausgewandert", "disqualifiziert", "bad data"].includes(st)) return leer("erreichbarkeit.cooldown", `Status „${lead.status}“ – keine Erreichbarkeits-Regel`);
+  const bisher = lead.fehlversuche ?? 0;
+  if (anzahl === 0) {
+    return bisher > 0 ? { regel: "erreichbarkeit.reset", beschreibung: "Erreicht → Zähler Fehlversuche auf 0", aktionen: [{ art: "lead_felder", felder: { fehlversuche: 0 } }] } : leer("erreichbarkeit.reset");
+  }
+  if (anzahl >= MAX_FEHLVERSUCHE) {
+    return {
+      regel: "erreichbarkeit.nicht_erreichbar",
+      beschreibung: `${anzahl}. Fehlversuch → Lead „Bad Data“ (nicht erreichbar), Opps verloren`,
+      aktionen: [
+        { art: "lead_status", status: "badData" },
+        { art: "opps_verloren", grund: "Nicht erreichbar" },
+        { art: "lead_felder", felder: { fehlversuche: anzahl, gesperrtBis: null } },
+        { art: "notiz", text: `📵 ${anzahl} Anrufversuche ohne Erreichen → automatisch „Bad Data“ (nicht erreichbar). Bei Rückmeldung des Leads Status einfach zurücksetzen.` },
+      ],
+    };
+  }
+  const h = COOLDOWN_STUNDEN[Math.min(anzahl, COOLDOWN_STUNDEN.length) - 1];
+  const bis = new Date(new Date(letzter ?? jetzt).getTime() + h * STUNDE);
+  const aktuell = lead.gesperrtBis ? new Date(lead.gesperrtBis) : null;
+  const sperre = aktuell && aktuell.getTime() >= bis.getTime() ? null : iso(bis);
+  if (bisher === anzahl && !sperre) return leer("erreichbarkeit.cooldown", "unverändert");
+  const dauer = h < 24 ? `${h} Std.` : `${h / 24} ${h === 24 ? "Tag" : "Tage"}`;
+  return {
+    regel: "erreichbarkeit.cooldown",
+    beschreibung: `Fehlversuch ${anzahl}/${MAX_FEHLVERSUCHE} → ${sperre ? `${dauer} gesperrt (bis ${datum(bis)} ${uhrzeit(bis)})` : "Zähler aktualisiert, längere Sperre bleibt"}`,
+    aktionen: [{ art: "lead_felder", felder: { fehlversuche: anzahl, ...(sperre ? { gesperrtBis: sperre } : {}) } }],
+  };
+}
+
 /** Auswertung eines Protokolls. `bearbeiter` = Close-User, der das Protokoll angelegt hat. */
 export function regeln(typ: ProtokollTyp, f: Felder, jetzt: Date = new Date(), bearbeiter: string | null = null): RegelErgebnis {
   const e = f.ergebnis ?? "";
@@ -177,10 +273,7 @@ export function regeln(typ: ProtokollTyp, f: Felder, jetzt: Date = new Date(), b
         const { d, aufgabe } = rueckrufAufgabe("📞 Rückruf vereinbart – Auswanderungs-Call buchen", f, jetzt, 24);
         return { regel: "erstkontakt.rueckruf", beschreibung: "Rückruf → Sperre bis Rückruf, Aufgabe", aktionen: [{ art: "lead_felder", felder: { gesperrtBis: iso(d) } }, aufgabe] };
       }
-      if (startsWith(e, E.nichtErreicht) || startsWith(e, E.mailbox) || startsWith(f.erreicht, "Nein")) {
-        const bis = inZukunft(f.kalender, jetzt) ? new Date(f.kalender!) : new Date(jetzt.getTime() + SPERRE_NICHT_ERREICHT_STUNDEN * STUNDE);
-        return { regel: "erstkontakt.nicht_erreicht", beschreibung: `Nicht erreicht → ${SPERRE_NICHT_ERREICHT_STUNDEN} Std. gesperrt`, aktionen: [{ art: "lead_felder", felder: { gesperrtBis: iso(bis) } }] };
-      }
+      if (startsWith(e, E.nichtErreicht) || startsWith(e, E.mailbox) || startsWith(f.erreicht, "Nein")) return nichtErreichtProtokoll("erstkontakt.nicht_erreicht", f, jetzt);
       return leer("erstkontakt.ohne_ergebnis");
     }
 
@@ -290,10 +383,7 @@ export function regeln(typ: ProtokollTyp, f: Felder, jetzt: Date = new Date(), b
       if (startsWith(e, E.tourGebucht)) return tourGebucht("followup.tour_gebucht", f, jetzt, null);
       if (startsWith(e, E.beratungTerminiert)) return beratungTerminiert("followup.beratung_terminiert", f, f.gelegtAuf ?? null, null);
       if (startsWith(e, E.verloren)) return verloren("followup.verloren", f, jetzt, f.verlustgrund ?? null);
-      if (startsWith(e, E.nichtErreicht) || startsWith(f.erreicht, "Nein")) {
-        const bis = inZukunft(f.kalender, jetzt) ? new Date(f.kalender!) : new Date(jetzt.getTime() + TAG);
-        return { regel: "followup.nicht_erreicht", beschreibung: "Nicht erreicht → 1 Tag (oder bis Kalender) gesperrt", aktionen: [{ art: "lead_felder", felder: { gesperrtBis: iso(bis) } }] };
-      }
+      if (startsWith(e, E.nichtErreicht) || startsWith(f.erreicht, "Nein")) return nichtErreichtProtokoll("followup.nicht_erreicht", f, jetzt);
       if (startsWith(e, E.weiter)) {
         const { d, aufgabe } = rueckrufAufgabe("🔁 Follow-up", f, jetzt, 48);
         return { regel: "followup.weiter", beschreibung: "Weiter Follow-up → Sperre bis Termin, Aufgabe", aktionen: [{ art: "lead_felder", felder: { gesperrtBis: iso(d) } }, aufgabe] };
@@ -317,7 +407,10 @@ export const REGEL_IDS: Record<string, string> = {
   "lead.neu": "Neuer Lead: Status „Neu eingetragen“ + Aufgabe sofort anrufen",
   "erstkontakt.erstgespraech_terminiert": "Erstkontakt: Erstgespräch gebucht",
   "erstkontakt.rueckruf": "Erstkontakt: Rückruf vereinbart",
-  "erstkontakt.nicht_erreicht": "Erstkontakt: Nicht erreicht / Mailbox",
+  "erstkontakt.nicht_erreicht": "Opening: Nicht erreicht / Mailbox (Cooldown über Erreichbarkeit)",
+  "erreichbarkeit.cooldown": "Erreichbarkeit: Fehlversuch → Cooldown 2 Std./4 Std./1/1/2/3 Tage",
+  "erreichbarkeit.nicht_erreichbar": "Erreichbarkeit: 7. Fehlversuch → Bad Data, Opps verloren „Nicht erreichbar“",
+  "erreichbarkeit.reset": "Erreichbarkeit: Erreicht → Zähler auf 0",
   "erstkontakt.kein_interesse": "Erstkontakt: Kein Interesse",
   "erstkontakt.bad_data": "Erstkontakt: Falsche Nummer",
   "erstgespraech.tour_gebucht": "Auswanderungs-Call: V.I.P. Tour gebucht",

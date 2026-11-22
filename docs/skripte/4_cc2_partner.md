@@ -38,5 +38,5 @@ Jede Sorge: **nachfragen → in eigenen Worten wiederholen → ehrlich beantwort
 - Beide niedrig → ehrlich abschließen, Wiedervorlage
 
 ## Close-Pflege (Pflicht)
-- Protokoll **„4 - Beratungsgespräch (Closing)“** (auch für CC2): Partner dabei = Ja, Haupteinwand, nächster Schritt
+- Protokoll **„4 - Closing (Beratungsgespräch / CC2)“**: Partner dabei = Ja, Haupteinwand, nächster Schritt
 - Notiz: Haltung Partner (Score), genannte Sorgen, was geklärt ist, was offen ist

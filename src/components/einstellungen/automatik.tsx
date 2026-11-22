@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 export interface LogZeile { id: number; at: string; lead_id: string | null; regel: string; beschreibung: string | null; ok: boolean; trocken: boolean; fehler: string | null }
 
 const GRUPPEN = [
-  { id: "lead", label: "0 · Neuer Lead", text: "Neuer Lead in Close → Status „Neu“ + Aufgabe „sofort anrufen“ für den Setter" },
-  { id: "erstkontakt", label: "1 · Erstkontakt (Terminierung)", text: "Nicht erreicht → Sperre · Erstgespräch terminiert → Opp „Setting“ · Rückruf → Aufgabe" },
-  { id: "erstgespraech", label: "2 · Erstgespräch (Setting)", text: "Beratung terminiert → Opp „Closing terminiert“ · No-Show → Rückholaufgabe · Follow-up → Aufgabe" },
-  { id: "closing", label: "3 · Beratung (Closing)", text: "Angebot → Opp „Angebot“ + Nachfassen Tag 1/3/7 · Gewonnen → Kunde · Verloren → Verlustgrund, Sperre" },
-  { id: "followup", label: "4 · Follow-up", text: "Weiter Follow-up → Sperre + Aufgabe · Gewonnen/Verloren wie Closing" },
+  { id: "lead", label: "0 · Neuer Lead", text: "Status „Neu eingetragen“, Leadquelle aus UTM/fbclid, Aufgabe „sofort anrufen“ für den Setter" },
+  { id: "erreichbarkeit", label: "Cooldown & Nicht erreichbar", text: "Jeder Fehlversuch (Anruf/Protokoll) → Sperre 2 Std. → 4 Std. → 1 → 1 → 2 → 3 Tage · 7. Fehlversuch → Bad Data, Opps verloren „Nicht erreichbar“ · Gespräch → Zähler auf 0" },
+  { id: "erstkontakt", label: "1 · Opening (Erstkontakt)", text: "Erstgespräch gebucht → Lead „Setting“, Opp „Setting – Terminiert“ · Rückruf → Sperre + Aufgabe · Kein Interesse → 90 Tage Sperre · Falsche Nummer → Bad Data" },
+  { id: "erstgespraech", label: "2 · Setting (Auswanderungs-Call)", text: "Tour gebucht → Aufgaben 7 Tage vorher + Tag danach · Beratung terminiert → Opp „Closing – Terminiert“ · No-Show → 3 Rückhol-Aufgaben · Follow-up → Aufgabe · Unqualifiziert → 90 Tage Sperre" },
+  { id: "vip_tour", label: "3 · V.I.P. Tour", text: "Gewonnen → Kunde + Umsetzung · Offen → Aufgabe Entscheidung · CC2/Beratung → Termin · Verloren → Verlustgrund, Sperre" },
+  { id: "closing", label: "4 · Closing (Beratungsgespräch / CC2)", text: "Angebot → Opp „Angebot“ + Nachfassen Tag 2/5/10 · Gewonnen → Kunde + Umsetzung · No-Show → Rückhol-Aufgabe · Verloren → Verlustgrund, Sperre" },
+  { id: "followup", label: "5 · Follow-up", text: "Weiter Follow-up → Sperre + Aufgabe · Termin gebucht → Stufe · Gewonnen/Verloren wie Closing" },
 ];
 
 function Schalter({ an, onChange, disabled, label }: { an: boolean; onChange: (v: boolean) => void; disabled?: boolean; label: string }) {

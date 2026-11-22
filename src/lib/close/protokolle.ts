@@ -90,7 +90,7 @@ const auswahl = (k: keyof typeof LEAD_FELDER) => (LEAD_FELDER[k] as { choices?: 
 export const PROTOKOLLE: ProtokollDef[] = [
   {
     typ: "erstkontakt",
-    name: "1 - Erstkontakt (Terminierung)",
+    name: "1 - Opening (Erstkontakt)",
     beschreibung: "Jeder Anrufversuch bei einem neuen Lead (nur mit Einwilligung, keine Kaltanrufe). Ziel: kostenlosen Auswanderungs-Call buchen.",
     felder: [
       { key: "erreicht", name: "📞 Erreicht?", typ: "choices", choices: ["Ja", "Nein / Mailbox", "Falsche Nummer"] },
@@ -101,7 +101,7 @@ export const PROTOKOLLE: ProtokollDef[] = [
   },
   {
     typ: "erstgespraech",
-    name: "2 - Auswanderungs-Call (Setting)",
+    name: "2 - Setting (Auswanderungs-Call)",
     beschreibung: "Kostenloser Auswanderungsberatungs-Call. Orientierung und Ablauf, keine Steuerberatung. Ziel: V.I.P. Tour oder Beratungsgespräch.",
     felder: [
       { key: "wohnsitz", name: "Aktueller Wohnsitz", typ: "choices", choices: auswahl("wohnsitz") },
@@ -139,7 +139,7 @@ export const PROTOKOLLE: ProtokollDef[] = [
   },
   {
     typ: "closing",
-    name: "4 - Beratungsgespräch (Closing)",
+    name: "4 - Closing (Beratungsgespräch / CC2)",
     beschreibung: "Deluxe-Beratungsgespräch (Video). Auch für CC2 mit Partner/Ehepartner verwenden.",
     felder: [
       { key: "partnerDabei", name: "Partner/Entscheider dabei?", typ: "choices", choices: ["Ja", "Nein"] },

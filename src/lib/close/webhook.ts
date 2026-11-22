@@ -116,6 +116,11 @@ export async function verarbeiteEvent(ev: WebhookEvent): Promise<string> {
         id: c.id, lead_id: c.lead_id, user_id: c.user_id, at: c.date_created, direction: c.direction, duration_sec: c.duration ?? 0,
         answered: c.disposition === "answered" && (c.duration ?? 0) >= 20, disposition: c.disposition,
       }]);
+      if (c.direction === "outbound" && c.status !== "in-progress") {
+        const { pruefeErreichbarkeit } = await import("./automatik");
+        const r = await pruefeErreichbarkeit(c.lead_id);
+        if (r) return `call ${id} · ${r}`;
+      }
       return `call ${id}`;
     }
     case "task.lead": {

@@ -54,8 +54,8 @@ Ohne Supabase-Verbindung läuft das Dashboard im **Demo-Modus** (simulierte Date
 - **Lead-Felder:** Herkunft/UTMs/fbclid, Termine (Setting/Closing/Tour), Setter/Closer, Quiz-Qualifizierung (Wohnsitz, Tätigkeit, Gewinn, ortsunabhängig, Kapitalgesellschaft ≥ 1 %, Familie, Region, Umzug, Partner …), Umsetzung (Paket-Start, Firma, Bank, Yellow Slip, Kanzlei-Kontakt, Testimonial, Empfehlungs-Potenzial)
 - **Opp-Felder:** Produkt, Zahlungsart, Cash collected, Tour angerechnet, Verlustgrund, Listenpreis, Angebot verschickt am
 - **Outcomes:** Meetings (Stattgefunden, No Show, Verschoben, Abgesagt), Calls (Nicht erreicht, Mailbox, Rückruf, Erstgespräch gebucht, Kein Interesse, Falsche Nummer)
-- **Protokolle:** 1 Erstkontakt · 2 Auswanderungs-Call (Setting) · 3 V.I.P. Tour · 4 Beratungsgespräch (Closing) · 5 Follow-up
-- **23 Smart Views** wie bei Felix: 1.x (SC) Closing, 2.x (QC) Setting, 3.x (CC) Opening, Kunden (Umsetzung hängt, Testimonial, Check-ins 3/6/12 Monate, Empfehlungsfrage), 0.9 ohne Bewegung
+- **Protokolle:** 1 Opening (Erstkontakt) · 2 Setting (Auswanderungs-Call) · 3 V.I.P. Tour · 4 Closing (Beratungsgespräch / CC2) · 5 Follow-up
+- **27 Smart Views** wie bei Felix, oben → unten mit Trennern: --Kunden-- (Umsetzung hängt, Testimonial, Check-ins, Empfehlungsfrage, 0.9 ohne Bewegung) · --Closing-- 1.x (SC) · --Setting-- 2.x (QC) · --Opening-- 3.x (CC)
 
 **Meeting-Typ aus dem Titel:** „V.I.P./Tour“ → Tour · „Beratungsgespräch/Deluxe/Closing“ → Beratung · „CC2/Partner“ → CC2 · sonst → Erstgespräch.
 
@@ -72,6 +72,9 @@ Close-Webhook `activity.custom_activity` → `regeln.ts` (getestet: `npm test`) 
 | Angebot verschickt | Opp „Angebot verschickt“ + Nachfass-Aufgaben Tag 2/5/10 |
 | Gewonnen (Deluxe) | Lead „Kunde in Umsetzung“, Opp gewonnen (Wert, Produkt, Tour angerechnet), **Umsetzungs-Opp „Onboarding“**, Paket-Start, Aufgaben Onboarding + „Kanzlei informieren – nur mit Einwilligung“ |
 | Unqualifiziert / Verloren | Lead „Unqualifiziert“, 90 Tage gesperrt (Wiedervorlage → 3.5) |
+| Nicht erreicht (Close-Anruf ohne Erreichen **oder** Protokoll „nicht erreicht/Mailbox“) | Zähler „Anrufversuche ohne Erreichen“ +1, Cooldown 2 Std. → 4 Std. → 1 Tag → 1 Tag → 2 Tage → 3 Tage (längere Sperren bleiben). Anruf + Protokoll innerhalb 30 Min. = ein Versuch |
+| 7. Fehlversuch | Lead „Bad Data“, Opps verloren („Nicht erreichbar“), Notiz. Gespräch zustande gekommen → Zähler 0 |
+| Neuer Lead ohne Leadquelle | Leadquelle aus fbclid (Meta) bzw. utm_source |
 | Disqualifiziert | Lead „Disqualifiziert“ |
 
 Einschalten unter Einstellungen oder `settings.data.automatik = { "aktiv": true }`. Echttest: `npm run close:probe -- --anwenden` (Test-Lead durch den ganzen Ablauf, wird danach gelöscht).

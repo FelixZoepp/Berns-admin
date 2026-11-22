@@ -7,9 +7,9 @@ import "server-only";
 
 import { adminClient } from "../supabase/admin";
 import { CloseClient } from "./client";
-import { LEAD_FELDER, LEAD_STATUS, OPP_FELDER, OPP_STATUS, PIPELINES, type LeadStatusKey, type OppStatusKey } from "./felder";
+import { LEAD_FELDER, LEAD_STATUS, OPP_FELDER, OPP_STATUS, PIPELINES, QUELLEN, quelleAus, type LeadStatusKey, type OppStatusKey } from "./felder";
 import { PROTOKOLLE, type ProtokollTyp } from "./protokolle";
-import { angebotNachfassen, regeln, type Aktion, type LeadFeldKey, type RegelErgebnis } from "./regeln";
+import { angebotNachfassen, anrufVersuch, erreichbarkeit, protokollVersuch, regeln, zaehleFehlversuche, type Aktion, type LeadFeldKey, type RegelErgebnis, type Versuch } from "./regeln";
 
 export interface AutomatikEinstellung { aktiv: boolean; regeln: Record<string, boolean> }
 
@@ -251,6 +251,8 @@ export async function verarbeiteProtokoll(activityId: string, jetzt: Date = new 
   await sb.from("close_protokolle").upsert({ ...basis, verarbeitet_am: new Date().toISOString() });
   if (zeilen.length) await sb.from("automatik_log").insert(zeilen);
   await calendlyOutcome(a.lead_id, typ, felder.ergebnis ?? null, jetzt);
+  const erreichbar = await pruefeErreichbarkeit(a.lead_id, jetzt);
+  if (erreichbar) zusammenfassung.push(erreichbar);
   return `Protokoll ${activityId} (${typ}): ${zusammenfassung.join(", ") || "keine Aktion"}`;
 }
 
@@ -300,6 +302,10 @@ export async function verarbeiteNeuenLead(leadId: string, jetzt: Date = new Date
   // Leads, die schon einen Ablauf-Status haben (z. B. vom Funnel gesetzt), nicht zurücksetzen
   const eigene = Object.values(LEAD_STATUS).map((x) => x.toLowerCase());
   const aktionen = eigene.includes((lead.status_label ?? "").toLowerCase()) ? e.aktionen.filter((a) => a.art !== "lead_status") : e.aktionen;
+  // Leadquelle aus UTM / fbclid, wenn der Funnel sie nicht gesetzt hat
+  const cf = (k: keyof typeof LEAD_FELDER) => (ctx.leadFeld as Record<string, string | undefined>)[k];
+  const quelle = quelleFuerNeuenLead(lead[`custom.${cf("quelle")}`], lead[`custom.${cf("utmSource")}`], lead[`custom.${cf("fbclid")}`]);
+  if (quelle) aktionen.push({ art: "lead_felder", felder: { quelle } });
   const an = regelAn(await automatikEinstellung(), e.regel);
   try {
     const log = an ? await fuehreAus(cl, ctx, leadId, aktionen, bearbeiter) : [];
@@ -309,4 +315,55 @@ export async function verarbeiteNeuenLead(leadId: string, jetzt: Date = new Date
     await sb.from("automatik_log").insert({ lead_id: leadId, regel: e.regel, beschreibung: e.beschreibung, aktionen, ok: false, trocken: !an, fehler: (err as Error).message.slice(0, 500) });
     return `Neuer Lead ${leadId}: FEHLER`;
   }
+}
+
+/** Leadquelle für einen neuen Lead: nur wenn leer und aus UTM/fbclid eindeutig ableitbar. */
+export function quelleFuerNeuenLead(vorhanden: unknown, utmSource: unknown, fbclid: unknown): string | null {
+  if (vorhanden) return null;
+  const key = fbclid ? "meta" : utmSource ? quelleAus(null, String(utmSource)) : null;
+  if (!key || key === "sonstige") return null;
+  return QUELLEN.find((q) => q.key === key)?.label ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Erreichbarkeit (Close-Webhook activity.call + nach jedem Protokoll): Fehlversuche zählen → Cooldown / Bad Data
+
+let outcomeCache: { at: number; namen: Map<string, string> } | null = null;
+async function outcomeNamen(cl: CloseClient) {
+  if (outcomeCache && Date.now() - outcomeCache.at < 10 * 60000) return outcomeCache.namen;
+  outcomeCache = { at: Date.now(), namen: new Map((await cl.alle("outcome/")).map((o: any) => [o.id, o.name])) };
+  return outcomeCache.namen;
+}
+
+export async function pruefeErreichbarkeit(leadId: string, jetzt: Date = new Date()): Promise<string | null> {
+  if (!leadId) return null;
+  const cl = new CloseClient();
+  const sb = adminClient();
+  const ctx = await kontext(cl);
+  const [calls, namen, lead, { data: prot }] = await Promise.all([
+    cl.get(`activity/call/?lead_id=${leadId}&_limit=100&_fields=id,direction,disposition,duration,date_created,outcome_id`),
+    outcomeNamen(cl),
+    cl.get(`lead/${leadId}/`),
+    sb.from("close_protokolle").select("typ,felder,datum").eq("lead_id", leadId).order("datum", { ascending: false }).limit(100),
+  ]);
+  const versuche: Versuch[] = [
+    ...((calls.data ?? []) as any[]).map((c) => anrufVersuch(c, c.outcome_id ? namen.get(c.outcome_id) : null)),
+    ...((prot ?? []) as any[]).map((p) => protokollVersuch(p.typ, p.felder ?? {}, p.datum)),
+  ].filter((x): x is Versuch => !!x);
+  const { anzahl, letzter } = zaehleFehlversuche(versuche);
+  const f = ctx.leadFeld;
+  const e = erreichbarkeit(anzahl, letzter, jetzt, {
+    status: lead.status_label ?? null,
+    gesperrtBis: f.gesperrtBis ? lead[`custom.${f.gesperrtBis}`] ?? null : null,
+    fehlversuche: f.fehlversuche && lead[`custom.${f.fehlversuche}`] != null ? Number(lead[`custom.${f.fehlversuche}`]) : null,
+  });
+  if (!e.aktionen.length) return null;
+  const an = regelAn(await automatikEinstellung(), e.regel);
+  try {
+    const log = an ? await fuehreAus(cl, ctx, leadId, e.aktionen, null) : [];
+    await sb.from("automatik_log").insert({ lead_id: leadId, regel: e.regel, beschreibung: e.beschreibung, aktionen: e.aktionen, ergebnis: log, ok: true, trocken: !an });
+  } catch (err) {
+    await sb.from("automatik_log").insert({ lead_id: leadId, regel: e.regel, beschreibung: e.beschreibung, aktionen: e.aktionen, ok: false, trocken: !an, fehler: (err as Error).message.slice(0, 500) });
+  }
+  return `${e.regel}${an ? "" : " (trocken)"}`;
 }

@@ -114,7 +114,7 @@ export const PRODUKTE: { key: Produkt; label: string }[] = [
 ];
 
 export const VERLUSTGRUENDE = [
-  "Preis", "Timing", "Partner/Familie dagegen", "Steuerlich nicht sinnvoll", "Andere Destination (Dubai, Paraguay, Portugal …)", "Macht es selbst", "Ghosting",
+  "Preis", "Timing", "Partner/Familie dagegen", "Steuerlich nicht sinnvoll", "Andere Destination (Dubai, Paraguay, Portugal …)", "Macht es selbst", "Ghosting", "Nicht erreichbar",
 ];
 
 export const LEAD_FELDER = {
@@ -136,6 +136,7 @@ export const LEAD_FELDER = {
   qualifiziertDurch: { name: "Lead qualifiziert durch Setter", type: "user" },
   closer: { name: "Closer für den Lead", type: "user" },
   gesperrtBis: { name: "Gesperrt bis", type: "datetime", description: "Bis dahin aus den Anruflisten (Smart Views) ausgeblendet" },
+  fehlversuche: { name: "Anrufversuche ohne Erreichen", type: "number", description: "Automatisch: Fehlversuche seit dem letzten Gespräch. Cooldown wächst je Versuch, ab 7 → Bad Data" },
   oldLead: { name: "Old Lead", type: "choices", choices: ["Ja", "Nein"] },
   // Qualifizierung (Quiz-Funnel)
   wohnsitz: { name: "Aktueller Wohnsitz", type: "choices", choices: ["Deutschland", "Österreich", "Schweiz", "anderes"] },
